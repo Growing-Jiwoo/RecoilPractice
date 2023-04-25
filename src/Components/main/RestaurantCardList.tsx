@@ -1,43 +1,18 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import theme from '../../Style/theme';
 import useNearRestaurangList from '../../Hooks/useNearRestaurangList';
 import useGeoLocation from '../../Hooks/useGeolocation';
 import Paging from '../../Hooks/usePaging';
 import type { RestaurantType } from '../../Type/interface';
 import { CardStyle } from './styled';
-
-interface CardListProps {
-  currentPosts: RestaurantType[];
-  userLocationName: string | undefined;
-}
-
-function MainCardList({ currentPosts, userLocationName }: CardListProps) {
-  return (
-    <div>
-      <CardStyle>
-        <div className="container">
-          <div id="title"> {userLocationName} 주변 음식점 목록</div>
-          {currentPosts.map((value: RestaurantType, index: number) =>
-            userLocationName == `부산 ${value.gugun.split(' ')[1]}` ? (
-              <div className="card" key={index}>
-                <div className="card_title">{value.bsnsnm}</div>
-                <div className="card_contents">
-                  <img
-                    className="food_img"
-                    alt="food_img"
-                    style={{ width: '200px' }}
-                    src={process.env.PUBLIC_URL + `/img/img_${value.id}.jpg`}
-                  />
-                </div>
-                <div className="card_footer">Tel : {value.tel}</div>
-              </div>
-            ) : null
-          )}
-        </div>
-      </CardStyle>
-    </div>
-  );
-}
+import { filteredRestaurantListSelector } from '../../recoil/Restaurant/selectors';
+import { useRecoilState, useRecoilValue, useSetRecoilState } from 'recoil';
+import {
+  restaurantListAtom,
+  userLocationAtom,
+} from '../../recoil/Restaurant/atoms';
+import { MainCardList } from './MainCardList';
+import React from 'react';
 
 function RestaurantCardList(): JSX.Element {
   const getNearRestaurangList = useNearRestaurangList(null);
@@ -46,37 +21,42 @@ function RestaurantCardList(): JSX.Element {
   const [postPerPage, setPostPerPage] = useState<number>(5);
   const [currentPosts, setCurrentPosts] = useState<RestaurantType[]>([]);
   const [count, setCount] = useState<number>(0);
+  const [restaurantList, setRestaurantList] =
+    useRecoilState(restaurantListAtom);
+  const setUserLocation = useSetRecoilState(userLocationAtom);
+  const filteredList = useRecoilValue(filteredRestaurantListSelector);
+
+  const memoizedCurrentPosts = useMemo(() => {
+    const indexOfLastPost = currentPage * postPerPage;
+    const indexOfFirstPost = indexOfLastPost - postPerPage;
+
+    return filteredList.slice(indexOfFirstPost, indexOfLastPost);
+  }, [currentPage, postPerPage, filteredList]);
 
   useEffect(() => {
-    if (getNearRestaurangList) {
-      const indexOfLastPost = currentPage * postPerPage;
-      const indexOfFirstPost = indexOfLastPost - postPerPage;
-      setCurrentPosts(
-        getNearRestaurangList.slice(indexOfFirstPost, indexOfLastPost)
-      );
-    }
+    setRestaurantList(getNearRestaurangList);
+  }, [getNearRestaurangList, setRestaurantList]);
 
-    if (location.loaded === true) {
-      let cnt = 0;
-      getNearRestaurangList.map((value: RestaurantType) =>
-        location.coordinates?.address == `부산 ${value.gugun.split(' ')[1]}`
-          ? cnt++
-          : null
-      );
-      setCount(cnt);
+  useEffect(() => {
+    if (location) {
+      setUserLocation(location.coordinates?.address);
     }
-  }, [currentPage, postPerPage, getNearRestaurangList, location]);
+  }, [location, setUserLocation]);
+
+  useEffect(() => {
+    setCurrentPosts(memoizedCurrentPosts);
+    setCount(filteredList.length);
+  }, [memoizedCurrentPosts, filteredList]);
+
   const setPage = (page: number) => {
     setCurrentPage(page);
   };
+
   return (
     <div>
-      {getNearRestaurangList.length !== 0 ? (
+      {restaurantList.length !== 0 ? (
         <div>
-          <MainCardList
-            currentPosts={currentPosts}
-            userLocationName={location.coordinates?.address}
-          />
+          <MainCardList currentPosts={currentPosts} />
           <Paging page={currentPage} count={count} setPage={setPage} />
         </div>
       ) : (
@@ -97,4 +77,4 @@ function RestaurantCardList(): JSX.Element {
   );
 }
 
-export default RestaurantCardList;
+export default React.memo(RestaurantCardList);
