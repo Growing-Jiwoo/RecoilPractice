@@ -1,30 +1,30 @@
 import { useEffect, useMemo, useState } from 'react';
 import theme from '../../Style/theme';
-import useNearRestaurangList from '../../Hooks/useNearRestaurangList';
 import useGeoLocation from '../../Hooks/useGeolocation';
 import Paging from '../../Hooks/usePaging';
 import type { RestaurantType } from '../../Type/interface';
 import { CardStyle } from './styled';
 import { filteredRestaurantListSelector } from '../../recoil/Restaurant/selectors';
-import { useRecoilState, useRecoilValue, useSetRecoilState } from 'recoil';
+import { useRecoilValue, useSetRecoilState } from 'recoil';
 import {
   restaurantListAtom,
   userLocationAtom,
 } from '../../recoil/Restaurant/atoms';
 import { MainCardList } from './MainCardList';
 import React from 'react';
+import useFetchRestaurantList from '../../Hooks/useSetRestauntList';
 
 function RestaurantCardList(): JSX.Element {
-  const getNearRestaurangList = useNearRestaurangList(null);
   const location = useGeoLocation();
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [postPerPage, setPostPerPage] = useState<number>(5);
   const [currentPosts, setCurrentPosts] = useState<RestaurantType[]>([]);
   const [count, setCount] = useState<number>(0);
-  const [restaurantList, setRestaurantList] =
-    useRecoilState(restaurantListAtom);
+  const restaurantList = useRecoilValue(restaurantListAtom);
   const setUserLocation = useSetRecoilState(userLocationAtom);
   const filteredList = useRecoilValue(filteredRestaurantListSelector);
+
+  useFetchRestaurantList();
 
   const memoizedCurrentPosts = useMemo(() => {
     const indexOfLastPost = currentPage * postPerPage;
@@ -32,10 +32,6 @@ function RestaurantCardList(): JSX.Element {
 
     return filteredList.slice(indexOfFirstPost, indexOfLastPost);
   }, [currentPage, postPerPage, filteredList]);
-
-  useEffect(() => {
-    setRestaurantList(getNearRestaurangList);
-  }, [getNearRestaurangList, setRestaurantList]);
 
   useEffect(() => {
     if (location) {
